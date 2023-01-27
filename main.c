@@ -69,13 +69,13 @@ _Bool game_is_move_playable(struct Game g, cell c) {
 }
 
 void game_play_move(struct Game *g, cell c, enum player p) {
-  switch (p) {
-  case X_PLAYER:
+  if (p == X_PLAYER) {
     g->x_board |= c;
-    break;
-  case O_PLAYER:
+    return;
+  }
+  if (p == O_PLAYER) {
     g->o_board |= c;
-    break;
+    return;
   }
 }
 
@@ -91,7 +91,7 @@ int game_evaluate_score(struct Game g) {
                     ? MAXIMIZER_WIN_SCORE
                     : 0);
 }
-const cell cells[3][3] = {{a1, a2, a3}, {b1, b2, b3}, {c1, c2, c3}};
+const cell cells[9] = {a1, a2, a3, b1, b2, b3, c1, c2, c3};
 
 int minimax(struct Game g, int depth, _Bool isMax) {
   int score = game_evaluate_score(g);
@@ -108,25 +108,21 @@ int minimax(struct Game g, int depth, _Bool isMax) {
   struct Game tmp;
   if (isMax) {
     int best = -1000;
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        if (game_is_move_playable(g, cells[i][j])) {
-          tmp = g;
-          tmp.x_board |= cells[i][j];
-          best = max(minimax(tmp, depth + 1, !isMax), best);
-        }
+    for (int i = 0; i < 9; ++i) {
+      if (game_is_move_playable(g, cells[i])) {
+        tmp = g;
+        tmp.x_board |= cells[i];
+        best = max(minimax(tmp, depth + 1, !isMax), best);
       }
     }
     return best;
   } else {
     int best = 1000;
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        if (game_is_move_playable(g, cells[i][j])) {
-          tmp = g;
-          tmp.o_board |= cells[i][j];
-          best = min(minimax(tmp, depth + 1, !isMax), best);
-        }
+    for (int i = 0; i < 9; ++i) {
+      if (game_is_move_playable(g, cells[i])) {
+        tmp = g;
+        tmp.o_board |= cells[i];
+        best = min(minimax(tmp, depth + 1, !isMax), best);
       }
     }
     return best;
@@ -144,42 +140,69 @@ cell game_find_best_move(struct Game g, enum player p) {
     g.x_board = g.o_board;
     g.o_board = t;
   }
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      if (game_is_move_playable(g, cells[i][j])) {
-        tmp = g;
-        tmp.x_board |= cells[i][j];
-        move_val = minimax(tmp, 0, false);
-        if (move_val > best_val) {
-          best_val = move_val;
-          move = cells[i][j];
-        }
+  for (int i = 0; i < 9; ++i) {
+    if (game_is_move_playable(g, cells[i])) {
+      tmp = g;
+      tmp.x_board |= cells[i];
+      move_val = minimax(tmp, 0, false);
+      if (move_val > best_val) {
+        best_val = move_val;
+        move = cells[i];
       }
     }
   }
   return move;
 }
 
-cell get_user_move() {
+cell get_user_move(enum player p) {
   int u_code = 0;
   do {
-    printf("Enter your move (1~9):");
+    printf("Enter your move %c (1~9):", p == X_PLAYER ? 'X' : 'O');
     scanf("%d", &u_code);
     if (!(u_code > 0 && u_code < 10))
       printf("you must be entered value between 1~9\r\n");
 
   } while (!(u_code > 0 && u_code < 10));
   u_code--;
-  cell *moves = cells;
-  return moves[u_code];
+  return cells[u_code];
 }
+void play_1v1(void) {
+  struct Game g = {0, 0};
+  int evaluate = 0;
+  int i = 0;
+  print_board(g);
+  do {
+    enum player p = i % 2 == 0 ? O_PLAYER : X_PLAYER;
+    cell u_move = get_user_move(p);
+    if (!game_is_move_playable(g, u_move)) {
+      if (!game_is_any_move_left(g)) {
+        break;
+      }
+      printf("You can't use this location\r\nThis location has already been "
+             "used!\r\n");
+      continue;
+    }
+    game_play_move(&g, u_move, p);
+    print_board(g);
+    ++i;
+  } while ((evaluate = game_evaluate_score(g)) == 0);
 
+  print_board(g);
+
+  if (evaluate == 0) {
+    printf("draw\n");
+  } else if (evaluate > 0) {
+    printf("X won\n");
+  } else {
+    printf("O won\n");
+  }
+}
 void play_with_ai(void) {
   struct Game g = {0, 0};
   int evaluate = 0;
   print_board(g);
   do {
-    cell u_move = get_user_move();
+    cell u_move = get_user_move(O_PLAYER);
     if (!game_is_move_playable(g, u_move)) {
       if (!game_is_any_move_left(g)) {
         break;
@@ -209,6 +232,6 @@ void play_with_ai(void) {
 }
 
 int main(int argc, char *argv[]) {
-  play_with_ai();
+  play_1v1();
   return EXIT_SUCCESS;
 }
