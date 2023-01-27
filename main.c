@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define MAXIMIZER_WIN_SCORE 10
 #define MINIMIZER_WIN_SCORE -10
@@ -24,6 +25,111 @@
     __typeof__(b) _b = (b);                                                    \
     _a < _b ? _a : _b;                                                         \
   })
+
+struct User {
+  char username[40];
+  int win_count, lose_count, draw_count;
+};
+
+int user_get_score(struct User u) { return u.win_count - u.lose_count; }
+
+int user_compare(const void *v1, const void *v2) {
+  const struct User *u1 = (struct User *)v1;
+  const struct User *u2 = (struct User *)v2;
+  int cmp;
+  if (user_get_score(*u1) > user_get_score(*u2)) {
+    return -1;
+  } else if (user_get_score(*u1) < user_get_score(*u2)) {
+    return 1;
+  } else if ((cmp = strcmp(u1->username, u2->username)) > 0) {
+    return 1;
+  } else if (cmp < 0) {
+    return -1;
+  }
+
+  return 0;
+}
+
+struct Users {
+  struct User *array;
+  size_t used;
+  size_t size;
+};
+
+// struct Users users;
+
+void users_remove_by_index(struct Users *u, int index) {
+  for (int i = index; i < u->used - 1; i++) {
+    u->array[i] = u->array[i + 1];
+  }
+  u->used--;
+}
+
+struct User users_pop_user(struct Users *u, struct User user) {
+  for (int i = 0; i < u->used; ++i) {
+    if (strcmp(u->array[i].username, user.username) == 0) {
+      user = u->array[i];
+      users_remove_by_index(u, i);
+      return user;
+    }
+  }
+  return user;
+}
+
+void users_init(struct Users *a, size_t initial_size) {
+  a->array = malloc(initial_size * sizeof(struct User));
+  a->used = 0;
+  a->size = initial_size;
+}
+
+void users_insert(struct Users *u, struct User user) {
+  if (u->used == u->size) {
+    u->size *= 2;
+    u->array = realloc(u->array, u->size * sizeof(struct User));
+  }
+  u->array[u->used++] = user;
+}
+
+int users_write_to_file(struct Users *u, FILE *fp) {
+  int wc = fwrite(&u->used, sizeof(u->used), 1, fp);
+  if (wc != 1) {
+    perror("unable to write Users.used");
+    return -1;
+  }
+  wc = fwrite(u->array, sizeof(struct User), u->used, fp);
+  if (wc != u->used) {
+    perror("unable to write Users.array");
+    return -1;
+  }
+  return 0;
+}
+
+int users_read_from_file(struct Users *u, FILE *fp) {
+  int used;
+  int rc = fread(&used, sizeof(u->used), 1, fp);
+  if (rc != 1) {
+    perror("unable to read Users.used");
+    return -1;
+  }
+  users_init(u, used);
+  rc = fread(u->array, sizeof(struct User), used, fp);
+  if (rc != used) {
+    perror("unable to read Users.array");
+    return -1;
+  }
+  u->used = used;
+  return 0;
+}
+
+void users_free(struct Users *u) {
+  free(u->array);
+  u->array = NULL;
+  u->used = u->size = 0;
+}
+
+void users_sort(struct Users *u) {
+  qsort(u->array, u->used, sizeof(struct User), user_compare);
+}
 
 typedef int32_t cell;
 
@@ -48,7 +154,7 @@ char game_cell_char(struct Game g, cell c, char default_char) {
 }
 
 void print_board(struct Game g) {
-  printf("\033[1J\r\n\tTic Tac Toe\r\n\r\n");
+  printf("\033[H\033[2J\r\n\tTic Tac Toe\r\n\r\n");
   printf("Player 1 (X)  -  Player 2 (O)\r\n\r\n\r\n");
   printf("     |     |     \n");
   printf("  %c  |  %c  |  %c \n", game_cell_char(g, a1, '1'),
@@ -166,9 +272,22 @@ cell get_user_move(enum player p) {
   u_code--;
   return cells[u_code];
 }
-void play_1v1(void) {
+
+void play_1v1(struct Users *users) {
+  struct User x = {.username = {0}};
+  struct User o = {.username = {0}};
+
+  printf("player O enter your name (max length is 39): ");
+  scanf("%s", o.username);
+
+  printf("player X enter your name (max length is 39): ");
+  scanf("%s", x.username);
+
+  x = users_pop_user(users, x);
+  o = users_pop_user(users, o);
+
   struct Game g = {0, 0};
-  int evaluate = 0;
+  int game_score = 0;
   int i = 0;
   print_board(g);
   do {
@@ -185,17 +304,26 @@ void play_1v1(void) {
     game_play_move(&g, u_move, p);
     print_board(g);
     ++i;
-  } while ((evaluate = game_evaluate_score(g)) == 0);
+  } while ((game_score = game_evaluate_score(g)) == 0);
 
   print_board(g);
 
-  if (evaluate == 0) {
+  if (game_score == 0) {
     printf("draw\n");
-  } else if (evaluate > 0) {
+    x.draw_count++;
+    o.draw_count++;
+  } else if (game_score > 0) {
     printf("X won\n");
+    x.win_count++;
+    o.lose_count++;
   } else {
     printf("O won\n");
+    x.lose_count++;
+    o.win_count++;
   }
+  users_insert(users, x);
+  users_insert(users, o);
+  users_sort(users);
 }
 void play_with_ai(void) {
   struct Game g = {0, 0};
@@ -231,7 +359,45 @@ void play_with_ai(void) {
   }
 }
 
+void print_scoreboard(const struct Users *u) {
+  printf("username\twin_count\tlose_count\tdraw_count\n");
+  for (int i = 0; i < u->used; ++i) {
+    printf("%40s\t%5d\t%5d\t%5d\n", u->array[i].username, u->array[i].win_count,
+           u->array[i].lose_count, u->array[i].draw_count);
+  }
+}
+
 int main(int argc, char *argv[]) {
-  play_1v1();
+  if (argc < 2) {
+    printf("usage: ./a.out /path/to/file.db\n");
+    return EXIT_FAILURE;
+  }
+  struct Users users;
+  FILE *fp = NULL;
+  if ((fp = fopen(argv[1], "r")) != NULL) {
+    if (users_read_from_file(&users, fp) == -1) {
+      fclose(fp);
+      printf("error reading from file\n");
+      return EXIT_FAILURE;
+    }
+  } else {
+    users_init(&users, 2);
+  }
+
+  play_1v1(&users);
+  print_scoreboard(&users);
+
+  if ((fp = fopen(argv[1], "w")) != NULL) {
+    if (users_write_to_file(&users, fp) == -1) {
+      printf("error writing to file\n");
+      fclose(fp);
+      return EXIT_FAILURE;
+    }
+  } else {
+    printf("unable to write file\n");
+    fclose(fp);
+    return EXIT_FAILURE;
+  }
+
   return EXIT_SUCCESS;
 }
