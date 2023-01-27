@@ -277,6 +277,7 @@ void play_1v1(struct Users *users) {
   struct User x = {.username = {0}};
   struct User o = {.username = {0}};
 
+  printf("\033[H\033[2J");
   printf("player O enter your name (max length is 39): ");
   scanf("%s", o.username);
 
@@ -327,7 +328,7 @@ void play_1v1(struct Users *users) {
 }
 void play_with_ai(void) {
   struct Game g = {0, 0};
-  int evaluate = 0;
+  int game_score = 0;
   print_board(g);
   do {
     cell u_move = get_user_move(O_PLAYER);
@@ -346,25 +347,34 @@ void play_with_ai(void) {
     }
     game_play_move(&g, ai_move, X_PLAYER);
     print_board(g);
-  } while ((evaluate = game_evaluate_score(g)) == 0);
+  } while ((game_score = game_evaluate_score(g)) == 0);
 
   print_board(g);
 
-  if (evaluate == 0) {
+  if (game_score == 0) {
     printf("draw\n");
-  } else if (evaluate > 0) {
-    printf("X won\n");
+  } else if (game_score > 0) {
+    printf("Computer won\n");
   } else {
-    printf("O won\n");
+    printf("You won\n");
   }
 }
 
 void print_scoreboard(const struct Users *u) {
+  printf("\033[H\033[2J");
+  if (u->used == 0) {
+    printf("no entry\n");
+    return;
+  }
   printf("username\twin_count\tlose_count\tdraw_count\n");
   for (int i = 0; i < u->used; ++i) {
     printf("%40s\t%5d\t%5d\t%5d\n", u->array[i].username, u->array[i].win_count,
            u->array[i].lose_count, u->array[i].draw_count);
   }
+}
+
+void print_menu() {
+  printf("0)Play with computer\n1)Start game\n2)Scoreboard\n3)Exit\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -384,9 +394,28 @@ int main(int argc, char *argv[]) {
     users_init(&users, 2);
   }
 
-  play_1v1(&users);
-  print_scoreboard(&users);
-
+  int choice = 0;
+  do {
+    print_menu();
+    printf("enter your choice:");
+    scanf("%d", &choice);
+    switch (choice) {
+    case 0:
+      play_with_ai();
+      break;
+    case 1:
+      play_1v1(&users);
+      break;
+    case 2:
+      print_scoreboard(&users);
+      break;
+    case 3:
+      break;
+    default:
+      printf("invalid choice");
+    }
+  } while (choice != 3);
+  printf("\033[H\033[2J");
   if ((fp = fopen(argv[1], "w")) != NULL) {
     if (users_write_to_file(&users, fp) == -1) {
       printf("error writing to file\n");
