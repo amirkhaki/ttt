@@ -11,6 +11,7 @@
 
 #define MAXIMIZER_WIN_SCORE 10
 #define MINIMIZER_WIN_SCORE -10
+#define INFINITY 1000
 
 #define max(a, b)                                                              \
   ({                                                                           \
@@ -28,7 +29,7 @@
 
 struct User {
   char username[40];
-  int win_count, lose_count, draw_count;
+  int win_count, lose_count, draw_count, score;
 };
 
 int user_get_score(struct User u) { return u.win_count - u.lose_count; }
@@ -37,9 +38,9 @@ int user_compare(const void *v1, const void *v2) {
   const struct User *u1 = (struct User *)v1;
   const struct User *u2 = (struct User *)v2;
   int cmp;
-  if (user_get_score(*u1) > user_get_score(*u2)) {
+  if (u1->score > u2->score) {
     return -1;
-  } else if (user_get_score(*u1) < user_get_score(*u2)) {
+  } else if (u1->score < u2->score) {
     return 1;
   } else if ((cmp = strcmp(u1->username, u2->username)) > 0) {
     return 1;
@@ -111,11 +112,15 @@ int users_read_from_file(struct Users *u, FILE *fp) {
     perror("unable to read Users.used");
     return -1;
   }
-  users_init(u, used);
-  rc = fread(u->array, sizeof(struct User), used, fp);
-  if (rc != used) {
-    perror("unable to read Users.array");
-    return -1;
+  if (used == 0) {
+    users_init(u, 2);
+  } else {
+    users_init(u, used);
+    rc = fread(u->array, sizeof(struct User), used, fp);
+    if (rc != used) {
+      perror("unable to read Users.array");
+      return -1;
+    }
   }
   u->used = used;
   return 0;
@@ -148,6 +153,7 @@ const cell b3 = 0x02000400;
 const cell c1 = 0x00820002;
 const cell c2 = 0x00402000;
 const cell c3 = 0x00200220;
+const cell computer_hint = 0x11111111;
 
 char game_cell_char(struct Game g, cell c, char default_char) {
   return (g.x_board & c) ? 'X' : (g.o_board & c ? 'O' : default_char);
@@ -213,7 +219,7 @@ int minimax(struct Game g, int depth, _Bool isMax) {
   }
   struct Game tmp;
   if (isMax) {
-    int best = -1000;
+    int best = -INFINITY;
     for (int i = 0; i < 9; ++i) {
       if (game_is_move_playable(g, cells[i])) {
         tmp = g;
@@ -223,7 +229,7 @@ int minimax(struct Game g, int depth, _Bool isMax) {
     }
     return best;
   } else {
-    int best = 1000;
+    int best = INFINITY;
     for (int i = 0; i < 9; ++i) {
       if (game_is_move_playable(g, cells[i])) {
         tmp = g;
@@ -237,7 +243,7 @@ int minimax(struct Game g, int depth, _Bool isMax) {
 
 cell game_find_best_move(struct Game g, enum player p) {
   cell move = -1;
-  int best_val = -100000, move_val;
+  int best_val = -INFINITY, move_val;
   struct Game tmp;
   if (p == O_PLAYER) {
     // assumed that X is maximizer, so if wanna find best move for O_PLAYER, we
@@ -263,8 +269,16 @@ cell game_find_best_move(struct Game g, enum player p) {
 cell get_user_move(enum player p) {
   int u_code = 0;
   do {
-    printf("Enter your move %c (1~9):", p == X_PLAYER ? 'X' : 'O');
-    scanf("%d", &u_code);
+    printf("Enter your move %c (1~9)[27 for computer move]:",
+           p == X_PLAYER ? 'X' : 'O');
+    int rc = scanf("%d", &u_code);
+    if (rc != 1) {
+      printf("invalid input\n");
+      continue;
+    }
+    if (u_code == 27) {
+      return computer_hint;
+    }
     if (!(u_code > 0 && u_code < 10))
       printf("you must be entered value between 1~9\r\n");
 
@@ -274,8 +288,8 @@ cell get_user_move(enum player p) {
 }
 
 void play_1v1(struct Users *users) {
-  struct User x = {.username = {0}};
-  struct User o = {.username = {0}};
+  struct User x = {.username = {0}, .score = 0};
+  struct User o = {.username = {0}, .score = 0};
 
   printf("\033[H\033[2J");
   printf("player O enter your name (max length is 39): ");
@@ -294,6 +308,19 @@ void play_1v1(struct Users *users) {
   do {
     enum player p = i % 2 == 0 ? O_PLAYER : X_PLAYER;
     cell u_move = get_user_move(p);
+    if (u_move == computer_hint) {
+      struct User *current_user = p == O_PLAYER ? &o : &x;
+      if (current_user->score <= 0) {
+        printf("You don't have enough score to use computer help :(\r\n");
+        continue;
+      }
+      cell computer_move = game_find_best_move(g, p);
+      if (computer_move == -1) {
+        break;
+      }
+      u_move = computer_move;
+      current_user->score--;
+    }
     if (!game_is_move_playable(g, u_move)) {
       if (!game_is_any_move_left(g)) {
         break;
@@ -316,11 +343,15 @@ void play_1v1(struct Users *users) {
   } else if (game_score > 0) {
     printf("X won\n");
     x.win_count++;
+    x.score += 6;
     o.lose_count++;
+    o.score -= 2;
   } else {
     printf("O won\n");
     x.lose_count++;
+    x.score -= 2;
     o.win_count++;
+    o.score += 6;
   }
   users_insert(users, x);
   users_insert(users, o);
@@ -366,10 +397,11 @@ void print_scoreboard(const struct Users *u) {
     printf("no entry\n");
     return;
   }
-  printf("username\twin_count\tlose_count\tdraw_count\n");
+  printf("username\tscore\twin_count\tlose_count\tdraw_count\n");
   for (int i = 0; i < u->used; ++i) {
-    printf("%40s\t%5d\t%5d\t%5d\n", u->array[i].username, u->array[i].win_count,
-           u->array[i].lose_count, u->array[i].draw_count);
+    printf("%40s\t%5d\t%5d\t%5d\t%5d\n", u->array[i].username,
+           u->array[i].score, u->array[i].win_count, u->array[i].lose_count,
+           u->array[i].draw_count);
   }
 }
 
@@ -398,7 +430,11 @@ int main(int argc, char *argv[]) {
   do {
     print_menu();
     printf("enter your choice:");
-    scanf("%d", &choice);
+    int rc = scanf("%d", &choice);
+    if (rc != 1) {
+      printf("invalid input\n");
+      continue;
+    }
     switch (choice) {
     case 0:
       play_with_ai();
@@ -424,7 +460,6 @@ int main(int argc, char *argv[]) {
     }
   } else {
     printf("unable to write file\n");
-    fclose(fp);
     return EXIT_FAILURE;
   }
 
