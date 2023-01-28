@@ -357,39 +357,6 @@ void play_1v1(struct Users *users) {
   users_insert(users, o);
   users_sort(users);
 }
-void play_with_ai(void) {
-  struct Game g = {0, 0};
-  int game_score = 0;
-  print_board(g);
-  do {
-    cell u_move = get_user_move(O_PLAYER);
-    if (!game_is_move_playable(g, u_move)) {
-      if (!game_is_any_move_left(g)) {
-        break;
-      }
-      printf("You can't use this location\r\nThis location has already been "
-             "used!\r\n");
-      continue;
-    }
-    game_play_move(&g, u_move, O_PLAYER);
-    cell ai_move = game_find_best_move(g, X_PLAYER);
-    if (ai_move == -1) {
-      break;
-    }
-    game_play_move(&g, ai_move, X_PLAYER);
-    print_board(g);
-  } while ((game_score = game_evaluate_score(g)) == 0);
-
-  print_board(g);
-
-  if (game_score == 0) {
-    printf("draw\n");
-  } else if (game_score > 0) {
-    printf("Computer won\n");
-  } else {
-    printf("You won\n");
-  }
-}
 
 void print_scoreboard(const struct Users *u) {
   printf("\033[H\033[2J");
@@ -405,9 +372,7 @@ void print_scoreboard(const struct Users *u) {
   }
 }
 
-void print_menu() {
-  printf("0)Play with computer\n1)Start game\n2)Scoreboard\n3)Exit\n");
-}
+void print_menu() { printf("1)Start game\n2)Scoreboard\n3)Exit\n"); }
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
@@ -436,9 +401,6 @@ int main(int argc, char *argv[]) {
       continue;
     }
     switch (choice) {
-    case 0:
-      play_with_ai();
-      break;
     case 1:
       play_1v1(&users);
       break;
