@@ -3,6 +3,7 @@
 // https://sisoog.com/2021/10/15/%D9%BE%DB%8C%D8%A7%D8%AF%D9%87-%D8%B3%D8%A7%D8%B2%DB%8C-%D9%87%D9%88%D8%B4-%D9%85%D8%B5%D9%86%D9%88%D8%B9%DB%8C-%D8%B4%D8%B7%D8%B1%D9%86%D8%AC-%D9%82%D8%B3%D9%85%D8%AA-%D8%AF%D9%88%D9%85-2/
 // presumption: O is minimizer and X is maximizer
 
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -26,6 +27,14 @@
     __typeof__(b) _b = (b);                                                    \
     _a < _b ? _a : _b;                                                         \
   })
+
+_Bool signal_received = false;
+
+void signal_hanlder(int signo) {
+  if (signo == SIGINT) {
+    signal_received = true;
+  }
+}
 
 struct User {
   char username[40];
@@ -333,7 +342,13 @@ void play_1v1(struct Users *users) {
     game_play_move(&g, u_move, p);
     print_board(g);
     ++i;
-  } while ((game_score = game_evaluate_score(g)) == 0);
+  } while ((game_score = game_evaluate_score(g)) == 0 &&
+           signal_received == false);
+
+  if (signal_received == true) {
+    signal_received = false; // unset signal
+    goto push_users;         // push popped users and return
+  }
 
   print_board(g);
 
@@ -354,6 +369,7 @@ void play_1v1(struct Users *users) {
     o.win_count++;
     o.score += 6;
   }
+push_users:
   users_insert(users, x);
   users_insert(users, o);
   users_sort(users);
@@ -393,6 +409,10 @@ int main(int argc, char *argv[]) {
     users_init(&users, 2);
   }
 
+  if (signal(SIGINT, signal_hanlder) == SIG_ERR) {
+    perror("can't catch SIGINT (CTRL-C usually)");
+  }
+
   int choice = 0;
   do {
     print_menu();
@@ -414,7 +434,7 @@ int main(int argc, char *argv[]) {
     default:
       printf("invalid choice");
     }
-  } while (choice != 3);
+  } while (choice != 3 && signal_received == false);
   printf("\033[H\033[2J");
   if ((fp = fopen(argv[1], "w")) != NULL) {
     if (users_write_to_file(&users, fp) == -1) {
