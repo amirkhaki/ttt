@@ -41,8 +41,6 @@ struct User {
   int win_count, lose_count, draw_count, score;
 };
 
-int user_get_score(struct User u) { return u.win_count - u.lose_count; }
-
 int user_compare(const void *v1, const void *v2) {
   const struct User *u1 = (struct User *)v1;
   const struct User *u2 = (struct User *)v2;
