@@ -51,6 +51,7 @@ int user_compare(const void *v1, const void *v2) {
   return 0;
 }
 
+// https://stackoverflow.com/a/3536261/17649624
 struct Users {
   struct User *array;
   size_t used;
@@ -387,6 +388,7 @@ int main(int argc, char *argv[]) {
       printf("error reading from file\n");
       return EXIT_FAILURE;
     }
+    fclose(fp);
   } else {
     users_init(&users, 2);
   }
@@ -416,11 +418,15 @@ int main(int argc, char *argv[]) {
   printf("\033[H\033[2J");
   if ((fp = fopen(argv[1], "w")) != NULL) {
     if (users_write_to_file(&users, fp) == -1) {
+      users_free(&users);
       printf("error writing to file\n");
       fclose(fp);
       return EXIT_FAILURE;
     }
+    fclose(fp);
+    users_free(&users);
   } else {
+    users_free(&users);
     printf("unable to write file\n");
     return EXIT_FAILURE;
   }
