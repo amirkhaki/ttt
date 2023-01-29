@@ -283,6 +283,10 @@ cell get_user_move(enum player p) {
            p == X_PLAYER ? 'X' : 'O');
     int rc = scanf("%d", &u_code);
     if (rc != 1) {
+      if (rc == EOF) {
+        signal_received = true;
+        return -1; // if user presses CTRL-D program should exit
+      }
       printf("invalid input\n");
       continue;
     }
@@ -301,12 +305,19 @@ void play_1v1(struct Users *users) {
   struct User x = {.username = {0}, .score = 0};
   struct User o = {.username = {0}, .score = 0};
 
-  printf("\033[H\033[2J");
+  printf("\033[H\033[2J"); // clear screen
+
   printf("player O enter your name (max length is 39): ");
-  scanf("%s", o.username);
+  int rc = scanf("%s", o.username);
+  if (rc != 1 && rc == EOF) {
+    return;
+  }
 
   printf("player X enter your name (max length is 39): ");
-  scanf("%s", x.username);
+  rc = scanf("%s", x.username);
+  if (rc != 1 && rc == EOF) {
+    return;
+  }
 
   x = users_pop_user(users, x);
   o = users_pop_user(users, o);
@@ -318,6 +329,9 @@ void play_1v1(struct Users *users) {
   do {
     enum player p = i % 2 == 0 ? O_PLAYER : X_PLAYER;
     cell u_move = get_user_move(p);
+    if (u_move == -1) {
+      break;
+    }
     if (u_move == computer_hint) {
       struct User *current_user = p == O_PLAYER ? &o : &x;
       if (current_user->score <= 0) {
@@ -369,6 +383,7 @@ void play_1v1(struct Users *users) {
     o.win_count++;
     o.score += 6;
   }
+
 push_users:
   users_insert(users, x);
   users_insert(users, o);
@@ -419,6 +434,9 @@ int main(int argc, char *argv[]) {
     printf("enter your choice:");
     int rc = scanf("%d", &choice);
     if (rc != 1) {
+      if (rc == EOF) {
+        break;
+      }
       printf("invalid input\n");
       continue;
     }
