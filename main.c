@@ -14,6 +14,12 @@
 #define MINIMIZER_WIN_SCORE -10
 #define INFINITY 1000
 
+#define RED "\e[0;31m"
+#define BLUE "\e[0;34m"
+#define RESET_COLOR "\e[0m"
+#define CLEAR_SCREEN "\e[2J"
+#define SET_CURSOR_TO_HOME "\e[H"
+
 #define max(a, b)                                                              \
   ({                                                                           \
     __typeof__(a) _a = (a);                                                    \
@@ -163,24 +169,26 @@ const cell c2 = 0x00402000;
 const cell c3 = 0x00200220;
 const cell computer_hint = 0x11111111;
 
-char game_cell_char(struct Game g, cell c, char default_char) {
-  return (g.x_board & c) ? 'X' : (g.o_board & c ? 'O' : default_char);
+char *game_cell_char(struct Game g, cell c, char *default_value) {
+  return (g.x_board & c)
+             ? BLUE "X" RESET_COLOR
+             : (g.o_board & c ? RED "O" RESET_COLOR : default_value);
 }
 
 void print_board(struct Game g) {
-  printf("\033[H\033[2J\r\n\tTic Tac Toe\r\n\r\n");
+  printf(SET_CURSOR_TO_HOME CLEAR_SCREEN "\r\n\tTic Tac Toe\r\n\r\n");
   printf("Player 1 (X)  -  Player 2 (O)\r\n\r\n\r\n");
   printf("     |     |     \n");
-  printf("  %c  |  %c  |  %c \n", game_cell_char(g, a1, '1'),
-         game_cell_char(g, a2, '2'), game_cell_char(g, a3, '3'));
+  printf("  %s  |  %s  |  %s \n", game_cell_char(g, a1, "1"),
+         game_cell_char(g, a2, "2"), game_cell_char(g, a3, "3"));
   printf("_____|_____|_____\n");
   printf("     |     |     \n");
-  printf("  %c  |  %c  |  %c \n", game_cell_char(g, b1, '4'),
-         game_cell_char(g, b2, '5'), game_cell_char(g, b3, '6'));
+  printf("  %s  |  %s  |  %s \n", game_cell_char(g, b1, "4"),
+         game_cell_char(g, b2, "5"), game_cell_char(g, b3, "6"));
   printf("_____|_____|_____\n");
   printf("     |     |     \n");
-  printf("  %c  |  %c  |  %c \n", game_cell_char(g, c1, '7'),
-         game_cell_char(g, c2, '8'), game_cell_char(g, c3, '9'));
+  printf("  %s  |  %s  |  %s \n", game_cell_char(g, c1, "7"),
+         game_cell_char(g, c2, "8"), game_cell_char(g, c3, "9"));
   printf("     |     |     \n\n");
 }
 
@@ -303,7 +311,7 @@ void play_1v1(struct Users *users) {
   struct User x = {.username = {0}, .score = 0};
   struct User o = {.username = {0}, .score = 0};
 
-  printf("\033[H\033[2J"); // clear screen
+  printf(SET_CURSOR_TO_HOME CLEAR_SCREEN); // clear screen
 
   printf("player O enter your name (max length is 39): ");
   int rc = scanf("%s", o.username);
@@ -389,7 +397,7 @@ push_users:
 }
 
 void print_scoreboard(const struct Users *u) {
-  printf("\033[H\033[2J");
+  printf(SET_CURSOR_TO_HOME CLEAR_SCREEN);
   if (u->used == 0) {
     printf("no entry\n");
     return;
