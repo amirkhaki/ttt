@@ -34,7 +34,9 @@
     _a < _b ? _a : _b;                                                         \
   })
 
-_Bool signal_received = false;
+_Bool signal_received =
+    false; // if any interrupt received from user (like CTRL-C) or internal
+           // program errors (like error in allocating memory)
 
 void signal_hanlder(int signo) {
   if (signo == SIGINT) {
@@ -71,8 +73,6 @@ struct Users {
   size_t size;
 };
 
-// struct Users users;
-
 void users_remove_by_index(struct Users *u, int index) {
   for (int i = index; i < u->used - 1; i++) {
     u->array[i] = u->array[i + 1];
@@ -100,7 +100,14 @@ void users_init(struct Users *a, size_t initial_size) {
 void users_insert(struct Users *u, struct User user) {
   if (u->used == u->size) {
     u->size *= 2;
-    u->array = realloc(u->array, u->size * sizeof(struct User));
+    struct User *arr = realloc(u->array, u->size * sizeof(struct User));
+    if (arr == NULL) {
+      printf("unable to allocate memory");
+      signal_received = true;
+      return;
+    } else {
+      u->array = arr;
+    }
   }
   u->array[u->used++] = user;
 }
