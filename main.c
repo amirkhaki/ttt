@@ -402,9 +402,9 @@ void print_scoreboard(const struct Users *u) {
     printf("no entry\n");
     return;
   }
-  printf("username\tscore\twin_count\tlose_count\tdraw_count\n");
+  printf("%40s\tscore\twin_count\tlose_count\tdraw_count\n", "username");
   for (int i = 0; i < u->used; ++i) {
-    printf("%40s\t%5d\t%5d\t%5d\t%5d\n", u->array[i].username,
+    printf("%40s\t%5d\t%9d\t%9d\t%9d\n", u->array[i].username,
            u->array[i].score, u->array[i].win_count, u->array[i].lose_count,
            u->array[i].draw_count);
   }
